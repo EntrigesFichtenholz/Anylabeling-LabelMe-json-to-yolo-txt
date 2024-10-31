@@ -4,9 +4,12 @@ import shutil
 import logging
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import numpy as np
+
 
 # Logging setup
 log_file = 'dataset_conversion.log'
+empty_annotations_log = 'empty_annotations.log'
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     handlers=[
@@ -32,6 +35,10 @@ os.makedirs(train_dir, exist_ok=True)
 if use_split and split_ratio > 0:
     os.makedirs(validate_dir, exist_ok=True)
 
+# Create a log for empty annotations
+with open(empty_annotations_log, 'w') as f:
+    f.write("Images with empty annotations:\n")
+
 # Collect JSON and image files
 json_files = [f for f in os.listdir(input_dir) if f.endswith('.json')]
 image_files = [f for f in os.listdir(input_dir) if f.endswith(('.jpg', '.png', '.jpeg'))]
@@ -49,19 +56,43 @@ else:
 # Automatically find all unique labels in the dataset
 label_set = set()
 
-# First pass to identify all unique labels
+# First pass to identify all unique labels in non-empty annotation files
 for filename in json_files:
     with open(os.path.join(input_dir, filename)) as f:
         data = json.load(f)
-        for shape in data['shapes']:
-            label_set.add(shape['label'])
+        if data.get('shapes'):  # Only process if shapes exist
+            for shape in data['shapes']:
+                label_set.add(shape['label'])
 
 # Create a class label mapping
 class_labels = {label: idx for idx, label in enumerate(sorted(label_set))}
 logger.info(f"Automatically found class labels: {class_labels}")
 
-# Copy all images to train and validate directories
-for image_file in tqdm(image_files, desc="Copying images"):
+# Copy images with non-empty annotations
+images_to_process = []
+for filename in json_files:
+    with open(os.path.join(input_dir, filename)) as f:
+        data = json.load(f)
+
+    image_filename = filename.replace('.json', '')
+    matching_image = next((image_filename + ext for ext in ['.jpg', '.png', '.jpeg']
+                           if os.path.isfile(os.path.join(input_dir, image_filename + ext))), None)
+
+    if matching_image:
+        if data.get('shapes'):  # Check if shapes exist
+            images_to_process.append(matching_image)
+        else:
+            # Log images with empty annotations
+            with open(empty_annotations_log, 'a') as log_file:
+                log_file.write(f"{matching_image}\n")
+            logger.warning(f"Skipping image {matching_image} due to empty annotations")
+
+# Filter train and validate images to only include those with annotations
+train_images = [img for img in train_images if img in images_to_process]
+validate_images = [img for img in validate_images if img in images_to_process]
+
+# Copy images with annotations
+for image_file in tqdm(train_images + validate_images, desc="Copying images"):
     current_output_dir = train_dir if image_file in train_images else validate_dir
     try:
         shutil.copy(os.path.join(input_dir, image_file), current_output_dir)
@@ -74,6 +105,10 @@ for filename in tqdm(json_files, desc="Converting annotations"):
         with open(os.path.join(input_dir, filename)) as f:
             data = json.load(f)
 
+        # Skip files without shapes
+        if not data.get('shapes'):
+            continue
+
         image_filename = filename.replace('.json', '')
         matching_image = next((image_filename + ext for ext in ['.jpg', '.png', '.jpeg']
                                if os.path.isfile(os.path.join(input_dir, image_filename + ext))), None)
@@ -83,33 +118,39 @@ for filename in tqdm(json_files, desc="Converting annotations"):
             out_file_path = os.path.join(current_output_dir, filename.replace('.json', '.txt'))
 
             with open(out_file_path, 'w') as out_file:
-                for shape in data['shapes']:
-                    class_label = shape['label']
-                    if class_label in class_labels:
-                        x1, y1 = shape['points'][0]
-                        x2, y2 = shape['points'][1]
+                for shape in data.get('shapes', []):
+                    try:
+                        label = shape['label']
+                        points = np.array(shape['points'], dtype=np.int32)
 
-                        try:
-                            dw = 1. / data['imageWidth']
-                            dh = 1. / data['imageHeight']
-                        except KeyError as e:
-                            logger.warning(f"Missing width/height in JSON {filename}: {e}")
-                            continue
+                        # Calculate bounding box
+                        x_min = points[:, 0].min()
+                        y_min = points[:, 1].min()
+                        x_max = points[:, 0].max()
+                        y_max = points[:, 1].max()
 
-                        w = x2 - x1
-                        h = y2 - y1
-                        x = x1 + (w / 2)
-                        y = y1 + (h / 2)
+                        # Normalize coordinates
+                        dw = 1. / data['imageWidth']
+                        dh = 1. / data['imageHeight']
 
-                        # Normalize bounding box coordinates
-                        x *= dw
-                        w *= dw
-                        y *= dh
-                        h *= dh
+                        x_center = (x_min + x_max) / 2
+                        y_center = (y_min + y_max) / 2
+                        w = x_max - x_min
+                        h = y_max - y_min
+
+                        x = x_center * dw
+                        y = y_center * dh
+                        w = w * dw
+                        h = h * dh
 
                         # Write to the YOLO format output file
-                        out_file.write(f"{class_labels[class_label]} {x} {y} {w} {h}\n")
-                        logger.debug(f"Processed label {class_label} for {filename} with coordinates x={x:.4f}, y={y:.4f}, w={w:.4f}, h={h:.4f}")
+                        out_file.write(f"{class_labels[label]} {x:.6f} {y:.6f} {w:.6f} {h:.6f}\n")
+                        logger.debug(f"Processed label {label} for {filename} with coordinates x={x:.4f}, y={y:.4f}, w={w:.4f}, h={h:.4f}")
+
+                    except (KeyError, IndexError) as e:
+                        logger.warning(f"Error while Processing Ann {filename}: {e}")
+                        continue
+
         else:
             logger.warning(f"No matching image found for JSON file {filename}")
 
