@@ -7,16 +7,30 @@ Tracks progress using a progress bar. Requires *scikit-learn* and *tqdm*.
 -**jsontoyolo_simple.py** will only convert the .json files to YOLO .txt files and copy them to your specified directory. Only uses built-in Python modules.
 
 **Usage:**
+Configuration Setup
+    *Hardcodet*
+    Set input_dir to the directory where your original dataset resides, and output_dir where you want to save the converted YOLO files.
 
--Define the `class_labels` for your dataset, example: `{"car": 0, "bike": 1, "plane": 2}`.
+Specify Train-Validation Split Ratio
+    *Hardcodet*
+    Adjust the split_ratio to control how much data is allocated for validation (e.g., 0.2 for 20%). The script will ask you whether to apply a split.
+    
+    Run the script. You will be prompted: Would you like to split the dataset into training and validation sets? (yes/no). Choose yes to use the specified split ratio or no to keep all         data for training.
 
--Change `input_dir` and `output_dir` to your required directories.
+File Extensions
+    
+    By default, the script handles images with extensions .jpg, .png, and .jpeg. If your dataset includes other extensions, you will need to modify lines in the script that filter for          specific image formats.
 
--set the `split_ratio`, example: `0.2 # 20% of the data will go to the validation set`.           
+Output
 
--If your pictures are a different file extension then *'.jpg', '.png', '.jpeg'* you have to modify or add the required extension to lines: 29, 47 and 48.
+    Each JSON file is converted to a YOLO-compatible .txt file with bounding box data normalized to the range [0, 1], based on each image’s width and height.
 
--Run the script and it should generate the .txt files in the specified directory.
+Logging
+
+    Logging outputs are saved to dataset_conversion.log and displayed in the console. Key information includes:
+        Total JSON and image files detected in input_dir
+        Automatic discovery of unique labels
+        Conversion progress and error messages
 
 ---
 
