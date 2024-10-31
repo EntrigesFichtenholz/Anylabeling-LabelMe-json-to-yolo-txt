@@ -4,8 +4,6 @@ Python for converting .json annotations from [Anylabeling](https://github.com/vi
 -**jsontoyolo.py** will convert the .json annotation files to YOLO .txt files, split them into 'train' and 'validate' folders and copy over the corresponding pictures. 
 Tracks progress using a progress bar. Requires *scikit-learn* and *tqdm*.
 
--**jsontoyolo_simple.py** will only convert the .json files to YOLO .txt files and copy them to your specified directory. Only uses built-in Python modules.
-
 **Usage:**
 Configuration Setup
     *Hardcodet*
