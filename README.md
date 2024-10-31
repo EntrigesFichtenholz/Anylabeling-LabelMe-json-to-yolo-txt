@@ -13,11 +13,11 @@ Specify Train-Validation Split Ratio
     *Hardcodet*
     Adjust the split_ratio to control how much data is allocated for validation (e.g., 0.2 for 20%). The script will ask you whether to apply a split.
     
-    Run the script. You will be prompted: Would you like to split the dataset into training and validation sets? (yes/no). Choose yes to use the specified split ratio or no to keep all         data for training.
+    Run the script. You will be prompted: Would you like to split the dataset into training and validation sets? (yes/no). Choose yes to use the specified split ratio or no to keep all data for training.
 
 File Extensions
     
-    By default, the script handles images with extensions .jpg, .png, and .jpeg. If your dataset includes other extensions, you will need to modify lines in the script that filter for          specific image formats.
+    By default, the script handles images with extensions .jpg, .png, and .jpeg. If your dataset includes other extensions, you will need to modify lines in the script that filter for specific image formats.
 
 Output
 
